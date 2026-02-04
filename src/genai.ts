@@ -114,8 +114,8 @@ Write only the final reply text below. Do not add quotation marks around your re
 
             const content = imageUrl
                 ? [
-                      { type: 'text', text: finalPrompt },
-                      { type: 'image_url', image_url: { url: imageUrl } },
+                      { type: 'text', text: finalPrompt } as const,
+                      { type: 'image_url', image_url: { url: imageUrl } } as const,
                   ]
                 : finalPrompt;
 

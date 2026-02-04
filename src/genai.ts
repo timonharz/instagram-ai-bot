@@ -112,15 +112,10 @@ Write only the final reply text below. Do not add quotation marks around your re
             const finalPrompt = videoUrl ? `${promptText}\n\nMedia type: video.` : promptText;
             const modelToUse = imageUrl ? this.visionModel : this.textModel;
 
-            const input = imageUrl
+            const content = imageUrl
                 ? [
-                      {
-                          role: 'user',
-                          content: [
-                              { type: 'input_text', text: finalPrompt },
-                              { type: 'input_image', image_url: imageUrl, detail: 'auto' },
-                          ],
-                      },
+                      { type: 'text', text: finalPrompt },
+                      { type: 'image_url', image_url: { url: imageUrl } },
                   ]
                 : finalPrompt;
 
@@ -128,14 +123,19 @@ Write only the final reply text below. Do not add quotation marks around your re
                 console.log(`[AI_INFO] Video URL detected but no image available: ${videoUrl.substring(0, 80)}...`);
             }
 
-            const response = await this.client.responses.create({
+            const response = await this.client.chat.completions.create({
                 model: modelToUse,
-                input,
+                messages: [
+                    {
+                        role: 'user',
+                        content,
+                    },
+                ],
                 temperature: this.temperature,
-                max_output_tokens: this.maxOutputTokens,
+                max_tokens: this.maxOutputTokens,
             });
 
-            const text = (response.output_text || '').trim();
+            const text = response.choices?.[0]?.message?.content?.trim() ?? '';
             if (!text) {
                 throw new Error('AI returned an empty comment.');
             }

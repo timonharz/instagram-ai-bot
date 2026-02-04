@@ -16,7 +16,7 @@
     "axios": "^1.10.0",
     "chalk": "^5.4.1",
     "openai": "^4.0.0",
-    "playwright": "^1.54.1",
+    "playwright": "^1.58.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }

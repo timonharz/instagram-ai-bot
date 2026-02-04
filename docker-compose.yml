@@ -1,0 +1,11 @@
+services:
+  instagram-bot:
+    build: .
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_TEXT_MODEL: ${GROQ_TEXT_MODEL}
+      GROQ_VISION_MODEL: ${GROQ_VISION_MODEL}
+    volumes:
+      - ./data:/app/data
+      - ./src/config.ts:/app/src/config.ts
+    shm_size: "1gb"

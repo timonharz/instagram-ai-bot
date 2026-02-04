@@ -200,7 +200,15 @@ export class InstagramBot {
             const homeIcon = this.page.locator('svg[aria-label="Home"]');
             if ((await homeIcon.count()) > 0) return true;
 
-            const usernameInput = this.page.locator('input[name="username"]');
+            const usernameInput = this.page.locator(
+                [
+                    'input[name="username"]',
+                    'input[autocomplete="username"]',
+                    'input[aria-label*="username" i]',
+                    'input[aria-label*="phone" i]',
+                    'input[aria-label*="email" i]',
+                ].join(',')
+            );
             if ((await usernameInput.count()) > 0) return false;
 
             return false;
@@ -239,18 +247,56 @@ export class InstagramBot {
         } catch (e) {}
     }
 
+    private async resolveLoginInputs(): Promise<{
+        scope: Page | Locator;
+        usernameInput: Locator;
+        passwordInput: Locator;
+    }> {
+        const loginForm = this.page.locator('form').filter({ has: this.page.locator('input[type="password"]') }).first();
+        const hasForm = (await loginForm.count()) > 0;
+        const scope: Page | Locator = hasForm ? loginForm : this.page;
+
+        const strictUsernameSelectors = [
+            'input[name="username"]',
+            'input[autocomplete="username"]',
+            'input[aria-label*="username" i]',
+            'input[aria-label*="phone" i]',
+            'input[aria-label*="email" i]',
+        ].join(',');
+        const relaxedUsernameSelectors = `${strictUsernameSelectors}, input[type="text"], input[type="email"]`;
+        const usernameSelectors = hasForm ? relaxedUsernameSelectors : strictUsernameSelectors;
+
+        const passwordSelectors = [
+            'input[name="password"]',
+            'input[autocomplete="current-password"]',
+            'input[aria-label*="password" i]',
+            'input[type="password"]',
+        ].join(',');
+
+        return {
+            scope,
+            usernameInput: scope.locator(usernameSelectors).first(),
+            passwordInput: scope.locator(passwordSelectors).first(),
+        };
+    }
+
     private async login() {
-        if ((await this.page.locator('input[name="username"]').count()) === 0) {
+        const initialLoginInputs = await this.resolveLoginInputs();
+        if ((await initialLoginInputs.usernameInput.count()) === 0) {
             this.logger.action('Navigating to login page...');
-            await this.page.goto('https://www.instagram.com/accounts/login/?hl=en');
+            await this.page.goto('https://www.instagram.com/accounts/login/?hl=en', {
+                waitUntil: 'domcontentloaded',
+            });
             await this.humanBehavior.randomizedWait(this.behavior.navigationWaitMs);
             await this.humanBehavior.moveMouseRandomly();
         }
 
         await this.dismissCommonPopups();
 
+        const { scope, usernameInput, passwordInput } = await this.resolveLoginInputs();
+
         try {
-            await this.page.waitForSelector('input[name="username"]', { timeout: 10000 });
+            await usernameInput.waitFor({ timeout: 15000, state: 'visible' });
         } catch (e) {
             await this.page.screenshot({ path: path.join(this.logsDir, `login_page_error_${this.config.username}.png`) });
             if (await this.checkIfLoggedIn()) {
@@ -258,16 +304,16 @@ export class InstagramBot {
                 await this.ensureCookiesAreSaved();
                 return;
             }
+            const currentUrl = this.page.url();
+            const pageTitle = await this.page.title();
+            this.logger.warn(`Login page missing username input. url=${currentUrl} title="${pageTitle}"`);
             throw new Error('Could not find username input on login page');
         }
 
         this.logger.action('Typing credentials...');
         await this.humanBehavior.randomizedWait(this.behavior.shortWaitMs);
 
-        const usernameSelector = 'input[name="username"]';
-        const passwordSelector = 'input[name="password"]';
-
-        await this.humanBehavior.naturalTyping(usernameSelector, this.config.username, {
+        await this.humanBehavior.naturalTyping(usernameInput, this.config.username, {
             min: 80,
             max: 250,
             typoChance: 0.07,
@@ -275,7 +321,7 @@ export class InstagramBot {
 
         await this.humanBehavior.randomDelay(500, 1500);
 
-        await this.humanBehavior.naturalTyping(passwordSelector, this.config.password, {
+        await this.humanBehavior.naturalTyping(passwordInput, this.config.password, {
             min: 100,
             max: 300,
             typoChance: 0.03,
@@ -284,7 +330,10 @@ export class InstagramBot {
         this.logger.action('Submitting login form...');
         await this.humanBehavior.randomDelay(800, 2000);
 
-        const loginButton = this.page.getByRole('button', { name: 'Log in', exact: true });
+        let loginButton = scope.getByRole('button', { name: /log in|sign in/i }).first();
+        if ((await loginButton.count()) === 0) {
+            loginButton = scope.locator('button[type="submit"], input[type="submit"]').first();
+        }
         await this.humanBehavior.hesitateAndClick(loginButton);
 
         try {

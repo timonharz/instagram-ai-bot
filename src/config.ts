@@ -45,8 +45,8 @@ export const config: Config = {
         developerMode: false,
         groqApiKey: process.env.GROQ_API_KEY ?? "YOUR_GROQ_API_KEY_HERE",
         monitoringIntervalSeconds: {
-            min: 360,
-            max: 600,
+            min: 90,
+            max: 180,
         },
         behavior: {
             shortWaitMs: { base: 1200, variance: 2000 },
